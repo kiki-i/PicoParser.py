@@ -1,0 +1,42 @@
+[build-system]
+requires = ["hatchling >= 1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "picoparser"
+version = "26.1"
+authors = [{ name = "kiki" }]
+description = "Convert PicoScenes .csi file to numpy .npy file with multithreaded parsing on Windows/Linux."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = ["numpy"]
+classifiers = [
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "Intended Audience :: Telecommunications Industry",
+  'Programming Language :: C',
+  'Programming Language :: Python',
+  'Programming Language :: Python :: 3',
+  'Programming Language :: Python :: 3 :: Only',
+  'Programming Language :: Python :: Implementation :: CPython',
+  'Topic :: Software Development',
+  'Topic :: Scientific/Engineering',
+  'Typing :: Typed',
+  'Operating System :: Microsoft :: Windows',
+  'Operating System :: POSIX',
+  'Operating System :: Unix',
+]
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
+
+[project.urls]
+Homepage = "https://codeberg.org/kiki-i/PicoParser.py"
+Issues = "https://codeberg.org/kiki-i/PicoParser.py/issues"
+
+[tool.hatch.build.targets.sdist]
+artifacts = ["libpico.so", "libpico.dll"]
+
+[tool.hatch.build.targets.wheel]
+artifacts = ["libpico.so", "libpico.dll"]
+
+[tool.hatch.build.targets.wheel.hooks.custom]

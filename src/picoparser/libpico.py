@@ -1,12 +1,11 @@
+from pathlib import Path
 import ctypes
 import sys
 
-from .LibpicoFrame import LibpicoRaw
+from .libpicoframe import LibpicoRaw
 
-if sys.platform == "win32":
-  libpico = ctypes.CDLL("./libpico.dll")
-else:
-  libpico = ctypes.CDLL("./libpico.so")
+ext = "dll" if sys.platform == "win32" else "so"
+libpico = ctypes.CDLL(Path(__file__).parent / "_native" / f"libpico.{ext}")
 
 libpico.getLibpicoFrameFromBuffer.restype = ctypes.POINTER(LibpicoRaw)
 libpico.getLibpicoFrameFromBuffer.argtypes = [
