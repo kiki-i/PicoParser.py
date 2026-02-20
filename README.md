@@ -7,7 +7,7 @@ An example using the [libpico](https://codeberg.org/kiki-i/libpico) dynamic link
 ## Usage
 
 ```Shell
-pip install picoparser-***-none-linux_x86_64.whl (picoparser-***-none-win_amd64.whl)
+pip install picoparser-***-py3-none-linux_x86_64.whl (picoparser-***-none-win_amd64.whl)
 ```
 
 * Replace `***` with the corresponding version in the release
