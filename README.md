@@ -10,7 +10,7 @@ An example using the [libpico](https://codeberg.org/kiki-i/libpico) dynamic link
 pip install picoparser-***-py3-none-linux_x86_64.whl (picoparser-***-none-win_amd64.whl)
 ```
 
-* Replace `***` with the corresponding version in the release
+* Replace `***` with the corresponding version in the release (Or build yourself).
 
 Example:
 
@@ -108,6 +108,15 @@ def getFrameNdarrayByIndices(
     Iterator of processed frame ndarrays.
   """
 ```
+
+## Build
+
+1. Build [libpico](https://codeberg.org/kiki-i/libpico) according its `README.md`.
+
+2. Move `libpico.so` (`libpico.dll` on Windows) to `src/picoparser/_native/`.
+
+3. Build wheels with `python -m build`.
+
 
 ## Dependencies
 
