@@ -9,7 +9,8 @@ import struct
 
 import numpy as np
 
-from .libpico import libpico, LibpicoRaw
+from .libpico import libpico
+from .PicoParserFrame import PicoParserFrame, libpicoFrameToPicoParserFrame
 
 
 @dataclass
@@ -21,10 +22,9 @@ class FrameNdarray:
 
 
 class PicoParser:
-  __interpSubcarrierIdx = np.array([-1, 0, 1])
   __maxWorker = os.cpu_count()
 
-  def __init__(self, filePath: Path, nWorker: int):
+  def __init__(self, filePath: Path, nWorker: int = 1):
     """
     Initialize PicoParser with file path and number of workers.
 
@@ -52,11 +52,12 @@ class PicoParser:
       self.__file.close()
 
   def __limitWorker(self, n: int) -> int:
-    if self.__maxWorker:
+    if n < 1 or self.__maxWorker is None:
+      return 1
+    else:
       return min(n, self.__maxWorker)
-    return n
 
-  def iterFrameIdx(self) -> Iterator[tuple[int, int]]:
+  def iterFrameIndices(self) -> Iterator[tuple[int, int]]:
     """
     Yield frame start offsets and lengths from the mapped file.
 
@@ -74,28 +75,28 @@ class PicoParser:
       yield (idx, frameLength)
       idx += frameLength
 
-  def iterFrameRaw(self) -> Iterator[memoryview]:
+  def iterFramesRaw(self) -> Iterator[memoryview]:
     """
-    Yield memoryview slices for each frame in the mapped file.
+    Yield memoryview slices for each frame in the memory mapped file.
 
     Yields:
-      A view of the bytes for the next frame.
+      A view of the bytes for frames.
     """
-    for idx, length in self.iterFrameIdx():
+    for idx, length in self.iterFrameIndices():
       yield self.__fileMmapView[idx : idx + length]
 
-  def iterFrameNdarray(self, interp: bool) -> Iterator[FrameNdarray]:
+  def iterFrames(self, interp: bool = False) -> Iterator[PicoParserFrame]:
     """
-    Yield frame data Ndarrays.
+    Yield frame data.
 
     Args:
       interp: Whether to apply interpolation along subcarrier.
 
     Yields:
-      Processed frame ndarrays
+      Processed frames.
     """
-    for idx in self.iterFrameIdx():
-      yield self.__getFrameNdarray(idx, interp)
+    for idx in self.iterFrameIndices():
+      yield self.__getFrame(idx, interp)
 
   def getNdarray(
     self,
@@ -103,12 +104,12 @@ class PicoParser:
     enableCsi: bool,
     enableMag: bool,
     enablePhase: bool,
-    interp: bool,
+    interp: bool = False,
   ) -> tuple[
-    np.datetime64 | None, np.ndarray | None, np.ndarray | None, np.ndarray | None
+    np.ndarray | None, np.ndarray | None, np.ndarray | None, np.ndarray | None
   ]:
     """
-    Return the whole file's ndarrays according to requested data types.
+    Return the whole file's ndarrays according to requested data types. (Only works on single pair of RX and TX NIC)
 
     Args:
       enableTs: Include timestamp data if True.
@@ -116,7 +117,6 @@ class PicoParser:
       enableMag: Include magnitude data if True.
       enablePhase: Include phase data if True.
       interp: Whether to apply interpolation along subcarrier.
-      nWorker: Number of worker threads to use.
 
     Returns:
       Ndarrays for each requested component.
@@ -127,15 +127,15 @@ class PicoParser:
     magList = []
     phaseList = []
 
-    for frame in self.getFrameNdarrayByIndices(self.iterFrameIdx(), interp):
+    for frame in self.getFramesByIndices(self.iterFrameIndices(), interp):
       if enableTs:
-        tstampList.append(frame.tstamp)
+        tstampList.append(frame.rxSBasic.tstamp)
       if enableCsi:
-        csiList.append(frame.csi)
+        csiList.append(frame.csi.csi)
       if enableMag:
-        magList.append(frame.mag)
+        magList.append(frame.csi.magnitude)
       if enablePhase:
-        phaseList.append(frame.phase)
+        phaseList.append(frame.csi.phase)
 
     tstamp = np.array(tstampList) if enableTs else None
     csi = np.array(csiList) if enableCsi else None
@@ -144,32 +144,31 @@ class PicoParser:
 
     return tstamp, csi, mag, phase
 
-  def getFrameNdarrayByIndices(
+  def getFramesByIndices(
     self,
     frameIndices: Iterable[tuple[int, int]],
-    interp: bool,
-  ) -> Iterator[FrameNdarray]:
+    interp: bool = False,
+  ) -> Iterator[PicoParserFrame]:
     """
-    Return frame ndarrays concurrently for provided indices.
+    Return frames concurrently for provided indices.
 
     Args:
       frameIndices: Frame start offsets and lengths.
       interp: Whether to apply interpolation along subcarrier.
-      nWorker: Number of worker threads to use.
 
-    Returns:
-      Iterator of processed frame ndarrays.
+    Yields:
+      Processed frames.
     """
     return self.__executor.map(
-      lambda x: self.__getFrameNdarray(x, interp),
+      lambda x: self.__getFrame(x, interp),
       frameIndices,
     )
 
-  def __getFrameNdarray(
+  def __getFrame(
     self,
     frameIdx: tuple[int, int],
     interpolate: bool,
-  ) -> FrameNdarray:
+  ) -> PicoParserFrame:
     idx, length = frameIdx
 
     buffer = (ctypes.c_ubyte * length).from_buffer(
@@ -177,47 +176,6 @@ class PicoParser:
     )
     libpicoRawPtr = libpico.getLibpicoFrameFromBuffer(buffer, length, True)
 
-    frameNdarray = self.__libpicoFrameToNdarray(libpicoRawPtr.contents, interpolate)
+    frame = libpicoFrameToPicoParserFrame(libpicoRawPtr.contents, interpolate)
     libpico.freeLibpicoFrame(libpicoRawPtr)
-    return frameNdarray
-
-  def __libpicoFrameToNdarray(
-    self,
-    raw: LibpicoRaw,
-    interp: bool,
-  ) -> FrameNdarray:
-    tstamp = np.datetime64(raw.rxSBasic.systemTime, "ns")
-
-    shape: tuple = (
-      raw.csi.nTones,
-      raw.csi.nTx,
-      raw.csi.nRx,
-      raw.csi.nCsi + raw.csi.nEss,
-    )
-
-    realNp = np.ctypeslib.as_array(raw.csi.csiRealPtr, shape)
-    imgNp = np.ctypeslib.as_array(raw.csi.csiImagPtr, shape)
-    csiNp = realNp + 1j * imgNp
-
-    magNp = np.ctypeslib.as_array(raw.csi.magnitudePtr, shape)
-    phaseNp = np.ctypeslib.as_array(raw.csi.phasePtr, shape)
-
-    if not interp:
-      subcarrierIdx = np.ctypeslib.as_array(
-        raw.csi.subcarrierIndicesPtr, (raw.csi.subcarrierIndicesSize,)
-      )
-      csiNp = self.__removeInterp(csiNp, subcarrierIdx)
-      magNp = self.__removeInterp(magNp, subcarrierIdx)
-      phaseNp = self.__removeInterp(phaseNp, subcarrierIdx)
-    else:
-      csiNp = csiNp.copy()
-      magNp = magNp.copy()
-      phaseNp = phaseNp.copy()
-
-    return FrameNdarray(tstamp, csiNp, magNp, phaseNp)
-
-  def __removeInterp(self, csi: np.ndarray, subcarrierIdx: np.ndarray) -> np.ndarray:
-    realSubcarrierIdx = np.nonzero(~np.isin(subcarrierIdx, self.__interpSubcarrierIdx))[
-      0
-    ]
-    return csi[realSubcarrierIdx]
+    return frame

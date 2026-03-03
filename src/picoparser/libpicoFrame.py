@@ -116,7 +116,7 @@ class LibpicoCsi(ctypes.Structure):
   ]
 
 
-class LibpicoRaw(ctypes.Structure):
+class LibpicoFrame(ctypes.Structure):
   _pack_ = 1
   _fields_ = [
     ("meta", LibpicoMeta),

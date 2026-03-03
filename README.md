@@ -18,19 +18,24 @@ Example:
 from picoparser import PicoParser
 
 with PicoParser(filePath, 4) as parser:
+
+  # Only works on single pair of RX and TX NIC
   tstampNdarray, csiNdarray, magNdarray, phaseNdarray = parser.getNdarray(
     True,
     True,
     True,
     True,
-    False,
   )
+
+  # Iterate each frame for further processing
+  for x in parser.iterFrames():
+    print(x.standardHeader.addr1)
 ```
 
 PicoParser's available methods:
 
 ```Python
-def __init__(self, filePath: Path, nWorker: int):
+def __init__(self, filePath: Path, nWorker: int = 1):
   """
   Initialize PicoParser with file path and number of workers.
 
@@ -39,7 +44,7 @@ def __init__(self, filePath: Path, nWorker: int):
     nWorker: Desired number of workers, greater than the number of CPUs will be ignored.
   """
 
-def iterFrameIdx(self) -> Iterator[tuple[int, int]]:
+def iterFrameIndices(self) -> Iterator[tuple[int, int]]:
   """
   Yield frame start offsets and lengths from the mapped file.
 
@@ -47,23 +52,39 @@ def iterFrameIdx(self) -> Iterator[tuple[int, int]]:
     Tuples of frame start index and length.
   """
 
-def iterFrame(self) -> Iterator[memoryview]:
+def iterFramesRaw(self) -> Iterator[memoryview]:
   """
-  Yield memoryview slices for each frame in the mapped file.
+  Yield memoryview slices for each frame in the memory mapped file.
 
   Yields:
-    A view of the bytes for the next frame.
+    A view of the bytes for frames.
   """
 
-def iterFrameNdarray(self, interp: bool) -> Iterator[FrameNdarray]:
+def iterFrames(self, interp: bool) -> Iterator[PicoParserFrame]:
   """
-  Yield frame data Ndarrays.
+  Yield frame data.
 
   Args:
     interp: Whether to apply interpolation along subcarrier.
 
   Yields:
-    Processed frame ndarrays
+    Processed frames.
+  """
+
+def getFramesByIndices(
+  self,
+  frameIndices: Iterable[tuple[int, int]],
+  interp: bool,
+) -> Iterator[PicoParserFrame]:
+  """
+  Return frames concurrently for provided indices.
+
+  Args:
+    frameIndices: Frame start offsets and lengths.
+    interp: Whether to apply interpolation along subcarrier.
+
+  Yields:
+    Processed frames.
   """
 
 def getNdarray(
@@ -74,10 +95,10 @@ def getNdarray(
   enablePhase: bool,
   interp: bool,
 ) -> tuple[
-  np.datetime64 | None, np.ndarray | None, np.ndarray | None, np.ndarray | None
+  np.ndarray | None, np.ndarray | None, np.ndarray | None, np.ndarray | None
 ]:
   """
-  Return the whole file's ndarrays according to requested data types.
+  Return the whole file's ndarrays according to requested data types. (Only works on single pair of RX and TX NIC)
 
   Args:
     enableTs: Include timestamp data if True.
@@ -85,27 +106,9 @@ def getNdarray(
     enableMag: Include magnitude data if True.
     enablePhase: Include phase data if True.
     interp: Whether to apply interpolation along subcarrier.
-    nWorker: Number of worker threads to use.
 
   Returns:
     Ndarrays for each requested component.
-  """
-
-def getFrameNdarrayByIndices(
-  self,
-  frameIndices: Iterable[tuple[int, int]],
-  interp: bool,
-) -> Iterator[FrameNdarray]:
-  """
-  Return frame ndarrays concurrently for provided indices.
-
-  Args:
-    frameIndices: Frame start offsets and lengths.
-    interp: Whether to apply interpolation along subcarrier.
-    nWorker: Number of worker threads to use.
-
-  Returns:
-    Iterator of processed frame ndarrays.
   """
 ```
 
