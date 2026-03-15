@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "picoparser"
-version = "26.3"
+version = "26.3.3"
 authors = [{ name = "kiki" }]
 description = "Convert PicoScenes .csi file to numpy .npy file with multithreaded parsing on Windows/Linux."
 readme = "README.md"

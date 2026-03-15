@@ -14,7 +14,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, ubuntu-22.04, windows-latest]
 
     steps:
       - name: Set reusable strings
@@ -33,7 +33,7 @@ jobs:
           path: ${{ steps.strings.outputs.libpico-dir }}
 
       - name: Install Clang (Windows)
-        if: matrix.os == 'windows-latest'
+        if: contains(matrix.os, 'windows')
         uses: egor-tensin/setup-clang@v2
 
       - name: Configure CMake
@@ -51,30 +51,41 @@ jobs:
           path: ${{ steps.strings.outputs.picoparser-dir }}
 
       - name: Move libpico (Linux)
-        if: matrix.os == 'ubuntu-latest'
+        if: contains(matrix.os, 'ubuntu')
         run: |
           mkdir ${{ steps.strings.outputs.native-lib-dir }}
           mv ${{ steps.strings.outputs.libpico-build-dir }}/*.so ${{ steps.strings.outputs.native-lib-dir }}
 
       - name: Move libpico (Windows)
-        if: matrix.os == 'windows-latest'
+        if: contains(matrix.os, 'windows')
         shell: pwsh
         run: |
           mkdir ${{ steps.strings.outputs.native-lib-dir }}
           mv ${{ steps.strings.outputs.libpico-build-dir }}/*.dll ${{ steps.strings.outputs.native-lib-dir }}
 
-      - uses: actions/setup-python@v6
       - name: Build wheels
         run: |
           cd ${{ steps.strings.outputs.picoparser-dir }}
           python -m pip install --upgrade build
           python -m build
+          mkdir ${{ github.workspace }}/artifacts
 
-      - name: Upload wheels
-        uses: actions/upload-artifact@v6
+      - name: Auditwheel repair (Linux)
+        if: contains(matrix.os, 'ubuntu')
+        run: |
+          python -m pip install auditwheel
+          auditwheel repair ${{ steps.strings.outputs.picoparser-dir }}/dist/*-linux_x86_64.whl
+          mv ${{ github.workspace }}/wheelhouse/*.whl ${{ github.workspace }}/artifacts
+
+      - name: Move wheels (Windows)
+        if: contains(matrix.os, 'windows')
+        run: |
+          mv ${{ steps.strings.outputs.picoparser-dir }}/dist/*.whl ${{ github.workspace }}/artifacts
+
+      - uses: actions/upload-artifact@v6
         with:
           name: build-artifacts-${{ matrix.os }}
-          path: ${{ steps.strings.outputs.picoparser-dir }}/dist/*
+          path: ${{ github.workspace }}/artifacts/*
 
   release:
     needs: build
@@ -93,3 +104,25 @@ jobs:
           files: artifacts/**/*.whl
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  pypi-publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/picoparser
+    permissions:
+      id-token: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v7
+        with:
+          path: artifacts
+
+      - name: Move artifacts
+        run: |
+          mkdir dist
+          mv artifacts/**/*.whl dist/
+
+      - name: Publish package distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

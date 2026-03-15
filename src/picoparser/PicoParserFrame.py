@@ -189,7 +189,7 @@ def libpicoFrameToPicoParserFrame(src: LibpicoFrame, interp: bool) -> PicoParser
     src.csi.nTones,
     src.csi.nTx,
     src.csi.nRx,
-    src.csi.nCsi + src.csi.nEss,
+    src.csi.nEss + src.csi.nCsi,
   )
 
   realNdarray = np.ctypeslib.as_array(src.csi.csiRealPtr, shape)

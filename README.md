@@ -7,10 +7,16 @@ An example using the [libpico](https://codeberg.org/kiki-i/libpico) dynamic link
 ## Usage
 
 ```Shell
-pip install picoparser-***-py3-none-linux_x86_64.whl (picoparser-***-none-win_amd64.whl)
+pip install picoparser
 ```
 
-* Replace `***` with the corresponding version in the release (Or build yourself).
+or
+
+```Shell
+pip install picoparser-***-py3-none-***.whl
+```
+
+* Replace `***` with the corresponding version in the releases (Or build yourself).
 
 Example:
 
@@ -60,7 +66,7 @@ def iterFramesRaw(self) -> Iterator[memoryview]:
     A view of the bytes for frames.
   """
 
-def iterFrames(self, interp: bool) -> Iterator[PicoParserFrame]:
+def iterFrames(self, interp: bool = False) -> Iterator[PicoParserFrame]:
   """
   Yield frame data.
 
@@ -74,7 +80,7 @@ def iterFrames(self, interp: bool) -> Iterator[PicoParserFrame]:
 def getFramesByIndices(
   self,
   frameIndices: Iterable[tuple[int, int]],
-  interp: bool,
+  interp: bool = False,
 ) -> Iterator[PicoParserFrame]:
   """
   Return frames concurrently for provided indices.
@@ -93,7 +99,7 @@ def getNdarray(
   enableCsi: bool,
   enableMag: bool,
   enablePhase: bool,
-  interp: bool,
+  interp: bool = False,
 ) -> tuple[
   np.ndarray | None, np.ndarray | None, np.ndarray | None, np.ndarray | None
 ]:
@@ -125,6 +131,10 @@ def getNdarray(
 
 * [libpico](https://codeberg.org/kiki-i/libpico)
 * numpy
+
+## If you find this helpful
+
+Please cite [**my works**](https://scholar.google.com/citations?user=XiudsEIAAAAJ).
 
 ## License
 
