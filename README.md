@@ -1,16 +1,18 @@
 # PicoParser.py
 
-Convert PicoScenes `.csi` file to numpy `.npy` file with multithreaded parsing. Provides **faster** parsing with significantly **lower memory usage** compared to [PicoScenes-Python-Toolbox](https://github.com/wifisensing/PicoScenes-Python-Toolbox).
+Parsing PicoScenes `.csi` file and convert it to numpy `.npy` file with multithreaded parsing. Provides **faster** parsing with significantly **lower memory usage** compared to [PicoScenes-Python-Toolbox](https://github.com/wifisensing/PicoScenes-Python-Toolbox).
 
 An example using the [libpico](https://codeberg.org/kiki-i/libpico) dynamic link library.
 
 ## Usage
 
+Download and install from [PyPI](https://pypi.org/project/picoparser/):
+
 ```Shell
 pip install picoparser
 ```
 
-or
+or install using local `.whl` file:
 
 ```Shell
 pip install picoparser-***-py3-none-***.whl
@@ -23,9 +25,10 @@ Example:
 ```Python
 from picoparser import PicoParser
 
+# Always use context manager
 with PicoParser(filePath, 4) as parser:
 
-  # Only works on single pair of RX and TX NIC
+  # Only use on single pair of RX and TX NIC
   tstampNdarray, csiNdarray, magNdarray, phaseNdarray = parser.getNdarray(
     True,
     True,
@@ -38,7 +41,7 @@ with PicoParser(filePath, 4) as parser:
     print(x.standardHeader.addr1)
 ```
 
-PicoParser's available methods:
+`PicoParser`'s available methods:
 
 ```Python
 def __init__(self, filePath: Path, nWorker: int = 1):
@@ -56,6 +59,22 @@ def iterFrameIndices(self) -> Iterator[tuple[int, int]]:
 
   Yields:
     Tuples of frame start index and length.
+  """
+
+def getFramesByIndices(
+  self,
+  frameIndices: Iterable[tuple[int, int]],
+  interp: bool = False,
+) -> Iterator[PicoParserFrame]:
+  """
+  Return frames concurrently for provided indices.
+
+  Args:
+    frameIndices: Frame start offsets and lengths.
+    interp: Whether to apply interpolation along subcarrier.
+
+  Yields:
+    Processed frames.
   """
 
 def iterFramesRaw(self) -> Iterator[memoryview]:
@@ -114,8 +133,109 @@ def getNdarray(
     interp: Whether to apply interpolation along subcarrier.
 
   Returns:
-    Ndarrays for each requested component.
+    Ndarray for timestamp, CSI, magnitude, and phase. None for non-requested component.
   """
+```
+
+Data structure of `PicoParserFrame`:
+
+```Python
+@dataclass
+class PicoParserFrame:
+  standardHeader: StandardHeader
+  rxSBasic: RxSBasic
+  rxExtraInfo: RxExtraInfo
+  csi: Csi
+
+@dataclass
+class Ieee80211MacFrameHeaderControlField:
+  version: int
+  type: int
+  subtype: int
+  toDS: int
+  fromDS: int
+  moreFrags: int
+  retry: int
+  powerMgmt: int
+  more: int
+  protect: int
+  order: int
+
+@dataclass
+class StandardHeader:
+  controlField: Ieee80211MacFrameHeaderControlField
+  addr1: np.ndarray
+  addr2: np.ndarray
+  addr3: np.ndarray
+  frag: int
+  seq: int
+
+@dataclass
+class RxSBasic:
+  deviceType: int
+  tstamp: int
+  systemTime: int
+  centerFreq: int
+  controlFreq: int
+  cbw: int
+  packetFormat: int
+  pktCbw: int
+  guardInterval: int
+  mcs: int
+  numSTS: int
+  numESS: int
+  numRx: int
+  noiseFloor: int
+  rssi: int
+
+@dataclass
+class RxExtraInfo:
+  featureCode: int
+  length: int
+  version: int
+  macAddrRom: np.ndarray
+  macAddrCur: np.ndarray
+  channelSelect: int
+  bmode: int
+  evm: np.ndarray
+  txChainMask: int
+  rxChainMask: int
+  txPower: int
+  cf: int
+  txTsf: int
+  lastHwTxTsf: int
+  channelFlags: int
+  txNess: int
+  tuningPolicy: int
+  pllRate: int
+  pllRefdiv: int
+  pllClockSelect: int
+  agc: int
+  antSelect: np.ndarray
+  samplingRate: int
+  cfo: int
+  sfo: int
+
+@dataclass
+class Csi:
+  deviceType: int
+  firmwareVersion: int
+  packetFormat: int
+  cbw: int
+  carrierFreq: int
+  samplingRate: int
+  subcarrierBandwidth: int
+  antSelect: int
+  subcarrierOffset: int
+  nTones: int
+  nTx: int
+  nRx: int
+  nEss: int
+  nCsi: int
+  subcarrierIndices: np.ndarray
+  csi: np.ndarray
+  magnitude: np.ndarray
+  phase: np.ndarray
 ```
 
 ## Build

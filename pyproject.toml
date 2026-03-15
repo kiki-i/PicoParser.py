@@ -4,9 +4,9 @@ build-backend = "hatchling.build"
 
 [project]
 name = "picoparser"
-version = "26.3.3"
+version = "26.3.5"
 authors = [{ name = "kiki" }]
-description = "Convert PicoScenes .csi file to numpy .npy file with multithreaded parsing on Windows/Linux."
+description = "Parsing PicoScenes .csi file and convert it to numpy .npy file with multithreaded parsing."
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = ["numpy"]
@@ -15,6 +15,7 @@ classifiers = [
   "Intended Audience :: Science/Research",
   "Intended Audience :: Telecommunications Industry",
   'Programming Language :: C',
+  'Programming Language :: C++',
   'Programming Language :: Python',
   'Programming Language :: Python :: 3',
   'Programming Language :: Python :: 3 :: Only',
@@ -23,8 +24,7 @@ classifiers = [
   'Topic :: Scientific/Engineering',
   'Typing :: Typed',
   'Operating System :: Microsoft :: Windows',
-  'Operating System :: POSIX',
-  'Operating System :: Unix',
+  'Operating System :: POSIX :: Linux',
 ]
 license = "AGPL-3.0-or-later"
 license-files = ["LICENSE"]

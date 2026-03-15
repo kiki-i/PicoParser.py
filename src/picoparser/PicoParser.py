@@ -32,6 +32,7 @@ class PicoParser:
       filePath: Path to the PicoScenes .csi file.
       nWorker: Desired number of workers, greater than the number of CPUs will be ignored.
     """
+
     self.__entered = False
     self.__filePath = filePath
     self.__nWorker = self.__limitWorker(nWorker)
@@ -64,6 +65,7 @@ class PicoParser:
     Yields:
       Tuples of frame start index and length.
     """
+
     fileSize = os.path.getsize(self.__filePath)
     mmView = self.__fileMmapView
 
@@ -82,6 +84,7 @@ class PicoParser:
     Yields:
       A view of the bytes for frames.
     """
+
     for idx, length in self.iterFrameIndices():
       yield self.__fileMmapView[idx : idx + length]
 
@@ -95,8 +98,30 @@ class PicoParser:
     Yields:
       Processed frames.
     """
+
     for idx in self.iterFrameIndices():
       yield self.__getFrame(idx, interp)
+
+  def getFramesByIndices(
+    self,
+    frameIndices: Iterable[tuple[int, int]],
+    interp: bool = False,
+  ) -> Iterator[PicoParserFrame]:
+    """
+    Return frames concurrently for provided indices.
+
+    Args:
+      frameIndices: Frame start offsets and lengths.
+      interp: Whether to apply interpolation along subcarrier.
+
+    Yields:
+      Processed frames.
+    """
+
+    return self.__executor.map(
+      lambda x: self.__getFrame(x, interp),
+      frameIndices,
+    )
 
   def getNdarray(
     self,
@@ -109,7 +134,7 @@ class PicoParser:
     np.ndarray | None, np.ndarray | None, np.ndarray | None, np.ndarray | None
   ]:
     """
-    Return the whole file's ndarrays according to requested data types. (Only works on single pair of RX and TX NIC)
+    Return the whole file's ndarrays according to requested data types. (Only use on single pair of RX and TX NIC)
 
     Args:
       enableTs: Include timestamp data if True.
@@ -119,7 +144,7 @@ class PicoParser:
       interp: Whether to apply interpolation along subcarrier.
 
     Returns:
-      Ndarrays for each requested component.
+      Ndarray for timestamp, CSI, magnitude, and phase. None for non-requested component.
     """
 
     tstampList = []
@@ -143,26 +168,6 @@ class PicoParser:
     phase = np.array(phaseList) if enablePhase else None
 
     return tstamp, csi, mag, phase
-
-  def getFramesByIndices(
-    self,
-    frameIndices: Iterable[tuple[int, int]],
-    interp: bool = False,
-  ) -> Iterator[PicoParserFrame]:
-    """
-    Return frames concurrently for provided indices.
-
-    Args:
-      frameIndices: Frame start offsets and lengths.
-      interp: Whether to apply interpolation along subcarrier.
-
-    Yields:
-      Processed frames.
-    """
-    return self.__executor.map(
-      lambda x: self.__getFrame(x, interp),
-      frameIndices,
-    )
 
   def __getFrame(
     self,
