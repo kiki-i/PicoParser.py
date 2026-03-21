@@ -28,17 +28,21 @@ from picoparser import PicoParser
 # Always use context manager
 with PicoParser(filePath, 4) as parser:
 
-  # Only use on single pair of RX and TX NIC
+  # Iterate each frame for further processing. Each frame is parsed one by one at iteration.
+  for x in parser.iterFrames():
+    print(x.standardHeader.addr1)
+
+  # Frames are queued and sent to thread pool for multithreaded parsing. Consume more resources than iter methods.
+  for x in parser.getFrames():
+    print(x.standardHeader.addr1)
+
+  # Convert the whole file to numpy ndarray. Only works on single pair of RX and TX NIC with consistent signal configuration.
   tstampNdarray, csiNdarray, magNdarray, phaseNdarray = parser.getNdarray(
     True,
     True,
     True,
     True,
   )
-
-  # Iterate each frame for further processing
-  for x in parser.iterFrames():
-    print(x.standardHeader.addr1)
 ```
 
 `PicoParser`'s available methods:
@@ -50,7 +54,7 @@ def __init__(self, filePath: Path, nWorker: int = 1):
 
   Args:
     filePath: Path to the PicoScenes .csi file.
-    nWorker: Desired number of workers, greater than the number of CPUs will be ignored.
+    nWorker: Desired number of workers for multithreaded parsing. Greater than os.cpu_count() will be ignored.
   """
 
 def iterFrameIndices(self) -> Iterator[tuple[int, int]]:
@@ -59,22 +63,6 @@ def iterFrameIndices(self) -> Iterator[tuple[int, int]]:
 
   Yields:
     Tuples of frame start index and length.
-  """
-
-def getFramesByIndices(
-  self,
-  frameIndices: Iterable[tuple[int, int]],
-  interp: bool = False,
-) -> Iterator[PicoParserFrame]:
-  """
-  Return frames concurrently for provided indices.
-
-  Args:
-    frameIndices: Frame start offsets and lengths.
-    interp: Whether to apply interpolation along subcarrier.
-
-  Yields:
-    Processed frames.
   """
 
 def iterFramesRaw(self) -> Iterator[memoryview]:
@@ -87,13 +75,13 @@ def iterFramesRaw(self) -> Iterator[memoryview]:
 
 def iterFrames(self, interp: bool = False) -> Iterator[PicoParserFrame]:
   """
-  Yield frame data.
+  Yield frame data. Each frame is parsed one by one at iteration, resulting in low memory consumption.
 
   Args:
     interp: Whether to apply interpolation along subcarrier.
 
   Yields:
-    Processed frames.
+    Parsed frames.
   """
 
 def getFramesByIndices(
@@ -102,14 +90,25 @@ def getFramesByIndices(
   interp: bool = False,
 ) -> Iterator[PicoParserFrame]:
   """
-  Return frames concurrently for provided indices.
+  Yield frame data with multithreaded parsing for provided indices. Frames are queued and sent to thread pool for parsing. Consume more resources than iter methods.
 
   Args:
     frameIndices: Frame start offsets and lengths.
     interp: Whether to apply interpolation along subcarrier.
 
   Yields:
-    Processed frames.
+    Parsed frames.
+  """
+
+def getFrames(self, interp: bool = False) -> Iterator[PicoParserFrame]:
+  """
+  Yield frame data with multithreaded parsing. All frames are queued and sent to thread pool for parsing. Consume more resources than iter methods.
+
+  Args:
+    interp: Whether to apply interpolation along subcarrier.
+
+  Yields:
+    Parsed frames.
   """
 
 def getNdarray(
@@ -123,7 +122,7 @@ def getNdarray(
   np.ndarray | None, np.ndarray | None, np.ndarray | None, np.ndarray | None
 ]:
   """
-  Return the whole file's ndarrays according to requested data types. (Only works on single pair of RX and TX NIC)
+  Return the whole file's ndarrays according to requested data types. Only works on single pair of RX and TX NIC with consistent signal configuration.
 
   Args:
     enableTs: Include timestamp data if True.

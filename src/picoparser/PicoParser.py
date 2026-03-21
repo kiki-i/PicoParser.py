@@ -1,5 +1,4 @@
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator, Iterable
 import ctypes
@@ -13,14 +12,6 @@ from .libpico import libpico
 from .PicoParserFrame import PicoParserFrame, libpicoFrameToPicoParserFrame
 
 
-@dataclass
-class FrameNdarray:
-  tstamp: np.datetime64
-  csi: np.ndarray
-  mag: np.ndarray
-  phase: np.ndarray
-
-
 class PicoParser:
   __maxWorker = os.cpu_count()
 
@@ -30,7 +21,7 @@ class PicoParser:
 
     Args:
       filePath: Path to the PicoScenes .csi file.
-      nWorker: Desired number of workers, greater than the number of CPUs will be ignored.
+      nWorker: Desired number of workers for multithreaded parsing. Greater than os.cpu_count() will be ignored.
     """
 
     self.__entered = False
@@ -90,13 +81,13 @@ class PicoParser:
 
   def iterFrames(self, interp: bool = False) -> Iterator[PicoParserFrame]:
     """
-    Yield frame data.
+    Yield frame data. Each frame is parsed one by one at iteration, resulting in low memory consumption.
 
     Args:
       interp: Whether to apply interpolation along subcarrier.
 
     Yields:
-      Processed frames.
+      Parsed frames.
     """
 
     for idx in self.iterFrameIndices():
@@ -108,19 +99,35 @@ class PicoParser:
     interp: bool = False,
   ) -> Iterator[PicoParserFrame]:
     """
-    Return frames concurrently for provided indices.
+    Yield frame data with multithreaded parsing for provided indices. Frames are queued and sent to thread pool for parsing. Consume more resources than iter methods.
 
     Args:
       frameIndices: Frame start offsets and lengths.
       interp: Whether to apply interpolation along subcarrier.
 
     Yields:
-      Processed frames.
+      Parsed frames.
     """
 
     return self.__executor.map(
       lambda x: self.__getFrame(x, interp),
       frameIndices,
+    )
+
+  def getFrames(self, interp: bool = False) -> Iterator[PicoParserFrame]:
+    """
+    Yield frame data with multithreaded parsing. All frames are queued and sent to thread pool for parsing. Consume more resources than iter methods.
+
+    Args:
+      interp: Whether to apply interpolation along subcarrier.
+
+    Yields:
+      Parsed frames.
+    """
+
+    return self.__executor.map(
+      lambda x: self.__getFrame(x, interp),
+      self.iterFrameIndices(),
     )
 
   def getNdarray(
@@ -134,7 +141,7 @@ class PicoParser:
     np.ndarray | None, np.ndarray | None, np.ndarray | None, np.ndarray | None
   ]:
     """
-    Return the whole file's ndarrays according to requested data types. (Only use on single pair of RX and TX NIC)
+    Return the whole file's ndarrays according to requested data types. Only works on single pair of RX and TX NIC with consistent signal configuration.
 
     Args:
       enableTs: Include timestamp data if True.
